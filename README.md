@@ -23,7 +23,7 @@ We're also building on top of the [OKD prometheus examples](https://github.com/o
 ![sidecar](img/sidecar.png)
 
 This is the least intrusive deployment. You can just add this without interfering with you prometheus at all. 
-One thing that you might need to add to your prometheus configuration is the `external_labels` section and `--storage.tsdb.{min, max}-block-duration` setting. See the (sidecar documentation)[https://github.com/improbable-eng/thanos/blob/master/docs/components/sidecar.md#sidecar] for the reasoning.
+One thing that you might need to add to your prometheus configuration is the `external_labels` section and `--storage.tsdb.{min, max}-block-duration` setting. See the [sidecar documentation](https://github.com/improbable-eng/thanos/blob/master/docs/components/sidecar.md#sidecar) for the reasoning.
 Here are the [full deployment template](prometheus_thanos_sidecar.yaml) and the [diff](prometheus_thanos_sidecar.yaml.patch) to the [original deployment template](https://github.com/openshift/origin/blob/release-3.11/examples/prometheus/prometheus.yaml).
 
 ```
