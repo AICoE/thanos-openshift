@@ -1,0 +1,98 @@
+--- prometheus.yaml	2018-12-03 12:26:21.000000000 +0100
++++ prometheus_thanos_sidecar.yaml	2018-12-03 12:41:35.000000000 +0100
+@@ -24,6 +24,13 @@
+ - description: The location of alert-buffer image
+   name: IMAGE_ALERT_BUFFER
+   value: openshift/prometheus-alert-buffer:v0.0.2
++- description: The location of thanos image
++  name: IMAGE_THANOS
++  value: improbable/thanos:master-2018-11-05-78e412c
++- description: S3 Access Key
++  name: THANOS_ACCESS_KEY
++- description: S3 Secret Key
++  name: THANOS_SECRET_KEY
+ - description: The session secret for the proxy
+   name: SESSION_SECRET
+   generate: expression
+@@ -155,6 +162,18 @@
+   stringData:
+     session_secret: "${SESSION_SECRET}="
+ 
++- apiVersion: v1
++  kind: Service
++  metadata:
++    name: thanos-sidecar
++  spec:
++    ports:
++    - name: cluster
++      port: 10901
++      targetPort: grpc
++    selector:
++      app: prometheus
++
+ # Create a fully end-to-end TLS connection to the alert proxy
+ - apiVersion: route.openshift.io/v1
+   kind: Route
+@@ -285,6 +304,8 @@
+         - name: prometheus
+           args:
+           - --storage.tsdb.retention=6h
++          - --storage.tsdb.min-block-duration=2h
++          - --storage.tsdb.max-block-duration=2h
+           - --config.file=/etc/prometheus/prometheus.yml
+           - --web.listen-address=localhost:9090
+           image: ${IMAGE_PROMETHEUS}
+@@ -311,6 +332,30 @@
+           - mountPath: /var/run/secrets/kubernetes.io/scraper
+             name: prometheus-scraper-secret
+ 
++        - name: thanos-sidecar
++          image: ${IMAGE_THANOS}
++          args:
++          - "sidecar"
++          - "--log.level=info"
++          - "--tsdb.path=/prometheus/data"
++          - "--prometheus.url=http://localhost:9090"
++          - "--cluster.address=:10900"
++          - "--grpc-address=:10901"
++          - "--http-address=:10902"
++          - "--objstore.config-file=/etc/prometheus/s3.yml"
++          ports:
++          - name: sidecar-http
++            containerPort: 10902
++          - name: grpc
++            containerPort: 10901
++          - name: cluster
++            containerPort: 10900
++          volumeMounts:
++          - mountPath: /etc/prometheus
++            name: prometheus-config
++          - mountPath: /prometheus
++            name: prometheus-data
++
+         # Deploy alertmanager behind prometheus-alert-buffer behind an oauth proxy
+         # use http port=4190 and https port=9943 to differ from prom-proxy
+         - name: alerts-proxy
+@@ -461,7 +506,22 @@
+         - record: apiserver_request_count_rate_by_resources
+           expr: sum without (client,instance,contentType) (rate(apiserver_request_count[5m]))
+ 
++    s3.yml: |-
++      type: S3
++      config:
++          endpoint: s3.cephserver.example:443
++          bucket: THANOS
++          access_key: ${THANOS_ACCESS_KEY}
++          secret_key: ${THANOS_SECRET_KEY}
++          insecure: false
++          signature_version2: false
++          encrypt_sse: false
++
+     prometheus.yml: |
++      global:
++        external_labels:
++          monitor: prometheus
++          replica: '$(HOSTNAME)'
+       rule_files:
+         - '*.rules'
+ 
